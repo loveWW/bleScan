@@ -36,10 +36,11 @@ public class BLE112Activity extends Activity {
 	private XYPlot blePlot = null;
 	private SimpleXYSeries bleSeries = null;
 	
-	private int bufferSize = 0;
-	private boolean writeFirstTime = true;
-	private long firstByte;
-	private long lastByte;
+	private int receivedSize = 0;
+	
+	private long timeForFirstByte;
+	private long timeForLastByte;
+	private boolean readyForFirstByte = true;
  
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -57,8 +58,7 @@ public class BLE112Activity extends Activity {
 
 		mConnectedGatt = device.connectGatt(BLE112Activity.this, false,
 				mGattCallback);
-		mHandler.sendMessage(Message.obtain(null, MSG_PROGRESS,
-				"Connecting to " + device.getName() + "..."));
+
 		
 		blePlot = (XYPlot) findViewById(R.id.blePlot);
 		bleSeries = new SimpleXYSeries("BLE");
@@ -181,44 +181,19 @@ public class BLE112Activity extends Activity {
 		public void onCharacteristicChanged(BluetoothGatt gatt,
 				BluetoothGattCharacteristic characteristic) {
 			// TODO Auto-generated method stub
-//			Log.d(TAG, "Changed");
-			bufferSize += characteristic.getValue().length;
-//			Log.i(TAG, "1: " + Converters.getAsciiValue(characteristic.getValue()) + " 2: " + bufferSize);
-//			Log.i(TAG, "s: " + bufferSize);
-//			byte[] dataReceived = characteristic.getValue();
-//			if (dataReceived.length == 1) {
-//				firstDigit = extractFirstDigit(characteristic);
-//			} else {
-//				otherDigits = extractOtherDigits(characteristic);
-//				String resultString = firstDigit + otherDigits;
-//				resultString = resultString.replaceAll("\\D+","");
-//				final int result = Integer.parseInt(resultString);
-			if ((bufferSize > 0) && writeFirstTime) {
-				firstByte = System.currentTimeMillis();
-				writeFirstTime = false;
+			receivedSize += characteristic.getValue().length;
+			
+			if ((receivedSize > 1) && readyForFirstByte) {
+				timeForFirstByte = System.currentTimeMillis();
+				readyForFirstByte = false;
 			}
-				
-			if (bufferSize > 995) {
-				lastByte = System.currentTimeMillis();
-				Log.i(TAG, "time: " + (lastByte - firstByte));
-				runOnUiThread(new Runnable() {
-					public void run() {
-						updateDisplayValues(bufferSize);
-					}
-				});
+			
+			if (receivedSize > 700) {
+				timeForLastByte = System.currentTimeMillis();
+				Log.i(TAG, "time: " + (timeForLastByte - timeForFirstByte));
 			}
-
-//				
-//				if (bleSeries.size() > bleSize) {
-//					bleSeries.removeFirst();
-//				}
-//				
-//				bleSeries.addLast(null, result);
-//				blePlot.redraw();
-//				Log.i(TAG, "the result is: " + result);
-//				
-//				
-//			}
+			
+			Log.i(TAG, "bytes received: " + receivedSize);
 		}
 
 		@Override
@@ -261,66 +236,4 @@ public class BLE112Activity extends Activity {
 		String otherDigits = Converters.getAsciiValue(characteristic.getValue());
 		return otherDigits;
 	}
-	
-	/*
-	 * We have a Handler to process event results on the main thread
-	 */
-	private static final int MSG_HUMIDITY = 101;
-	private static final int MSG_PRESSURE = 102;
-	private static final int MSG_PRESSURE_CAL = 103;
-	private static final int MSG_PROGRESS = 201;
-	private static final int MSG_DISMISS = 202;
-	private static final int MSG_CLEAR = 301;
-	private Handler mHandler = new Handler() {
-		@Override
-		public void handleMessage(Message msg) {
-			BluetoothGattCharacteristic characteristic;
-			switch (msg.what) {
-			case MSG_HUMIDITY:
-				characteristic = (BluetoothGattCharacteristic) msg.obj;
-				if (characteristic.getValue() == null) {
-					Log.w(TAG, "Error obtaining humidity value");
-					return;
-				}
-				updateHumidityValues(characteristic);
-				break;
-			case MSG_PRESSURE:
-				characteristic = (BluetoothGattCharacteristic) msg.obj;
-				if (characteristic.getValue() == null) {
-					Log.w(TAG, "Error obtaining pressure value");
-					return;
-				}
-				updatePressureValue(characteristic);
-				break;
-			case MSG_PRESSURE_CAL:
-				characteristic = (BluetoothGattCharacteristic) msg.obj;
-				if (characteristic.getValue() == null) {
-					Log.w(TAG, "Error obtaining cal value");
-					return;
-				}
-				updatePressureCals(characteristic);
-				break;
-			case MSG_CLEAR:
-				clearDisplayValues();
-				break;
-			}
-		}
-	};
-
-	/* Methods to extract sensor data and update the UI */
-
-	private void updateHumidityValues(BluetoothGattCharacteristic characteristic) {
-
-	}
-
-	private int[] mPressureCals;
-
-	private void updatePressureCals(BluetoothGattCharacteristic characteristic) {
-
-	}
-
-	private void updatePressureValue(BluetoothGattCharacteristic characteristic) {
-
-	}
-
 }
